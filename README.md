@@ -1,0 +1,5 @@
+# discordBot ServerController_oroginal
+当DiscordBotは作者が個人的に管理しているサーバを監視を行い、一部遊戯を提供するBotです
+
+## discordBot ServerController_oroginalの今後の予定について
+今後JavaからPythonへ移行する予定です。
