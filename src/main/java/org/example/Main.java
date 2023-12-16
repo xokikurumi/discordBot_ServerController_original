@@ -35,6 +35,7 @@ import org.eclipse.jetty.websocket.WebSocket;
 import org.eclipse.jetty.websocket.WebSocketClient;
 import org.eclipse.jetty.websocket.WebSocketClientFactory;
 import org.example.common.Notice;
+import org.example.common.commonToken;
 import org.example.common.logger;
 import org.example.threads.CoterieEvents;
 import org.example.threads.quekeThread;
@@ -63,14 +64,13 @@ import java.util.concurrent.Future;
 @Slf4j
 public class Main extends ListenerAdapter  {
     private quekeThread qt;
-    private static String TOKEN = "TOKEN";
 
 //    private static final Logger logger;
     public static void main(String[] args) throws LoginException, InterruptedException {
         log.info("DiscordBot Start.");
         Notice.info("DiscordBot Start");
 
-        JDA jda = JDABuilder.createDefault(TOKEN)
+        JDA jda = JDABuilder.createDefault(commonToken.TOKEN)
                 .enableIntents(GatewayIntent.MESSAGE_CONTENT)
                 .enableIntents(GatewayIntent.GUILD_VOICE_STATES)
                 .enableIntents(GatewayIntent.GUILD_VOICE_STATES)
