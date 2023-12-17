@@ -1,6 +1,6 @@
 package org.example;
 
-import com.fasterxml.jackson.core.JsonFactoryBuilder;
+
 import lombok.extern.slf4j.Slf4j;
 import net.dv8tion.jda.api.*;
 import net.dv8tion.jda.api.audio.AudioReceiveHandler;
@@ -13,14 +13,12 @@ import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.concrete.VoiceChannel;
 import net.dv8tion.jda.api.entities.channel.unions.AudioChannelUnion;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
-import net.dv8tion.jda.api.events.GatewayPingEvent;
+import net.dv8tion.jda.api.entities.sticker.StickerItem;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberJoinEvent;
 import net.dv8tion.jda.api.events.guild.member.GuildMemberRemoveEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
-import net.dv8tion.jda.api.events.session.ShutdownEvent;
-import net.dv8tion.jda.api.hooks.EventListener;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
@@ -31,16 +29,12 @@ import net.dv8tion.jda.api.utils.cache.CacheFlag;
 
 import net.objecthunter.exp4j.Expression;
 import net.objecthunter.exp4j.ExpressionBuilder;
-import org.eclipse.jetty.websocket.WebSocket;
-import org.eclipse.jetty.websocket.WebSocketClient;
-import org.eclipse.jetty.websocket.WebSocketClientFactory;
 import org.example.common.Notice;
 import org.example.common.commonToken;
 import org.example.common.logger;
 import org.example.threads.CoterieEvents;
 import org.example.threads.quekeThread;
 import org.jetbrains.annotations.NotNull;
-import org.slf4j.Logger;
 
 
 import javax.security.auth.login.LoginException;
@@ -48,18 +42,13 @@ import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
-import javax.swing.text.html.Option;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Future;
 
 @Slf4j
 public class Main extends ListenerAdapter  {
@@ -127,21 +116,41 @@ public class Main extends ListenerAdapter  {
 //        logFileMsg.append("[" + e.getMember().getUser().get+ "]");
 
 
-
+        List<StickerItem> stickerList = e.getMessage().getStickers();
 
         List<Message.Attachment> listAttachiment = e.getMessage().getAttachments();
 
         if(listAttachiment.size() != 0){
             logFileMsg.append("[ファイルあり]");
-            for(Message.Attachment attachment : listAttachiment){
-                logger.downloadFile(attachment.getUrl(),
-                        sdfYYYYMMDDHHMMSSLog.format(calLog.getTime()) + "_" + e.getMessageId() + "_" + attachment.getFileName());
-            }
+
+            /// ファイルダウンロードに時間がかかるため、Threadsを使用し処理停滞を回避
+            Thread th = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    for(Message.Attachment attachment : listAttachiment){
+                        logger.downloadFile(attachment.getUrl(),e.getGuild().getName(),
+                                sdfYYYYMMDDHHMMSSLog.format(calLog.getTime()) + "_" + e.getMessageId() + "_" + attachment.getFileName());
+                    }
+                }
+            });
+            th.run();
+
+
         } else {
             logFileMsg.append("[ファイルなし]");
         }
+        if(stickerList.size() != 0){
+            logFileMsg.append("[ステッカーあり]");
+            for (StickerItem si : stickerList) {
+                logFileMsg.append(si.getId() +  "@"+ si.getName());
+
+            }
+        }else{
+            logFileMsg.append("[ステッカーなし]");
+        }
         logFileMsg.append(e.getMessage().getContentRaw());
-        logger.info(e.getGuild().getName() , "[" + e.getChannel().getId() + "][" + e.getChannel().getType().toString() + "]" + e.getChannel().getName(), logFileMsg.toString());
+        logger.info(e.getGuild().getName()
+                , "[" + e.getChannel().getId() + "][" + e.getChannel().getType().toString() + "]" + e.getChannel().getName(), logFileMsg.toString());
 
         String msg = e.getMessage().getContentRaw().replaceAll("\n","").replaceAll("\r","");
 

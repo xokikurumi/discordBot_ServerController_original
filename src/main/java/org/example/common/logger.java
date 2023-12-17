@@ -27,11 +27,16 @@ public class logger {
     }
 
 
-    public static boolean downloadFile(String path, String file_name){
+    public static boolean downloadFile(String path, String serverName, String file_name){
 
         boolean result = false;
         try {
-        URL url = new URL(path);
+            File file = new File(FILE_PATH + "img\\" + serverName);
+            if(!file.exists()){
+                file.mkdirs();
+            }
+
+            URL url = new URL(path);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 
             conn.setAllowUserInteraction(false);
@@ -52,7 +57,7 @@ public class logger {
             // Output Stream
             DataOutputStream dataOutStream = new DataOutputStream(
                     new BufferedOutputStream(
-                            new FileOutputStream(FILE_PATH + "img\\" + file_name)));
+                            new FileOutputStream(FILE_PATH + "img\\" + serverName + "\\"+ file_name)));
 
             // Read Data
             byte[] b = new byte[4096];
