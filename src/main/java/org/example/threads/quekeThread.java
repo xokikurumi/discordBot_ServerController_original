@@ -7,6 +7,7 @@ import net.dv8tion.jda.api.JDABuilder;
 import net.dv8tion.jda.api.OnlineStatus;
 import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
+import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.FileUpload;
@@ -14,6 +15,7 @@ import net.dv8tion.jda.api.utils.cache.CacheFlag;
 import org.eclipse.jetty.util.StringUtil;
 import org.example.Config;
 import org.example.YAML;
+import org.example.common.logger;
 import org.example.db.Database;
 import org.example.db.Query;
 import org.w3c.dom.Text;
@@ -33,15 +35,18 @@ import java.util.List;
 import java.util.Map;
 
 public class quekeThread extends Thread {
-    ReadyEvent re;
+    MessageReceivedEvent re;
 
 
-    public quekeThread(ReadyEvent re){
+    public quekeThread(MessageReceivedEvent re){
         this.re = re;
     }
 
     @Override
     public void run() {
+
+        logger.info("thread", "[Thread][QuekeThread] QuekeThread","Thread Start!!!");
+
         while (true){
             LocalDateTime ldt = LocalDateTime.now();
             ZonedDateTime zdt = ldt.atZone(ZoneOffset.ofHours(+9));
@@ -98,7 +103,7 @@ public class quekeThread extends Thread {
                                         // 位置情報送信
                                         if(!(jn.get("earthquake").get("hypocenter").get("latitude").asText().equalsIgnoreCase("-200")
                                                 && jn.get("earthquake").get("hypocenter").get("longitude").asText().equalsIgnoreCase("-200"))){
-                                            String locationURL = "https://maps.google.com/maps/@${0},${1},10z?q=${0},${1}";
+                                            String locationURL = "https://maps.google.com/maps/@${0},${1},14z?q=${0},${1}";
 
                                             locationURL = locationURL.replaceAll("\\$\\{0\\}",jn.get("earthquake").get("hypocenter").get("latitude").asText());
                                             locationURL = locationURL.replaceAll("\\$\\{1\\}",jn.get("earthquake").get("hypocenter").get("longitude").asText());
@@ -107,17 +112,11 @@ public class quekeThread extends Thread {
                                         }
                                         System.out.println(header);
                                         System.out.println(body);
-                                        if(body.length() > 2000){
-                                            int cuts = body.length() / 2000 + 1;
-                                            for(int l = 0; r < cuts ; r++){
-                                                if(body.length() < ((r+1)*2000)){
-                                                    tc.sendMessage(body.substring(r*2000, body.length())).queue();
-                                                }else{
-                                                    tc.sendMessage(body.substring(r*2000, (r+1) * 2000 - 1)).queue();
-                                                }
-                                            }
-                                        }else {
-                                            tc.sendMessage(body).queue();
+                                        logger.info("thread", "[Thread][QuekeThread] QuekeThread",header);
+                                        logger.info("thread", "[Thread][QuekeThread] QuekeThread",body);
+                                        List<String> ls = sendMsgTrim(body);
+                                        for(String msg: ls){
+                                            tc.sendMessage(msg).queue();
                                         }
                                     }
                                 }
@@ -132,57 +131,40 @@ public class quekeThread extends Thread {
                     }
 
                     // 津波
-/*                    if(jn.get("code").asInt() == 552){
+                    if(jn.get("code").asInt() == 552){
+                        String query = Query.TSUNAMI_SELECT.replaceAll("\\$\\{0\\}",jn.get("id").asText());
+                        String[] checkResult = Database.executeCheckIdStr(query);
+                        if(checkResult.length == 0){
+                            // 未発信の場合
+                            tsunamiInfo(jn);
 
-                        String query = Query.EARTH_QUAKE_SELECT.replaceAll("\\$\\{0\\}",jn.get("id").asText());
-                        query = query.replaceAll("\\$\\{1\\}","TSUNAMI");
-                        query = query.replaceAll("\\$\\{2\\}","TSUNAMI");
-                        if(!Database.executeCheckId(query)){
-
-                        }
-                        Config conf = YAML.getConfig();
-                        for(String id: conf.getEath_quake_infomation_id()){
-                            TextChannel tc = re.getJDA().getTextChannelById(id);
-                            if(jn.get("cancelled").asBoolean()){
-                                // 津波予報が解除
-                                if(tc.canTalk()){
-                                    String headerTsunami = "<@&1089680055891927040>\n";
-                                    headerTsunami += "津波予報が全て解除されました。\n";
-
-                                    tc.sendMessage(headerTsunami).queue();
-                                }
-                            }else{
-                                String headerTsunami = "<@&1089680055891927040>\n";
-                                headerTsunami += "津波予報が発令されました。\n";
-                                headerTsunami += "対象地域は以下の通りです。\n";
-                                // 津波予報が解除されていない
-                                //画像生成用のファイル名 (津波予報区名_津波予報の種類.png)
-                                List<String> tsunamiArea = new ArrayList<String>();
-
-                                headerTsunami += tsunamiInfo(jn.get("areas"));
-                                for(JsonNode area: jn.get("areas")){
-
-                                    tsunamiArea.add(area.get("name").asText() + "_" + area.get("grade").asText() + ".png");
-                                }
-
-                                // メッセージ送信
-                                tc.sendMessage(headerTsunami).queue();
-                                // ファイル送信
-
-                            }
+                            // 対象データを保存
+                            query = Query.TSUNAMI_INSERT.replaceAll("\\$\\{0\\}",jn.get("id").asText());
+                            query = query.replaceAll("\\$\\{1\\}",jn.get("time").asText());
+                            Database.save(query);
                         }
 
-                        query = Query.EARTH_QUAKE_INSERT.replaceAll("\\$\\{0\\}",jn.get("id").asText());
-                        query = Query.EARTH_QUAKE_INSERT.replaceAll("\\$\\{0\\}",jn.get("id").asText());
-                        query = query.replaceAll("\\$\\{1\\}","TSUNAMI");
-                        query = query.replaceAll("\\$\\{2\\}","TSUNAMI");
-                        query = query.replaceAll("\\$\\{3\\}",jn.get("time").asText());
-                        Database.save(query);
-                    }*/
+                    }
 
                     // 緊急地震速報（警報）
                     if(jn.get("code").asInt() == 556){
-                        
+                        String query = Query.EEW_SELECT.replaceAll("\\$\\{0\\}",jn.get("id").asText());
+                        String[] checkResult = Database.executeCheckIdStr(query);
+                        if(checkResult.length == 0){
+                            body = EEW_Info(jn);
+                            List<String> line = sendMsgTrim(body);
+                            for(String ln : line){
+                                Config conf = YAML.getConfig();
+                                for(String id: conf.getEath_quake_infomation_id()) {
+                                    TextChannel tc = re.getJDA().getTextChannelById(id);
+                                    tc.sendMessage(ln).queue();
+                                }
+                            }
+
+                            query = Query.EEW_INSERT.replaceAll("\\$\\{0\\}",jn.get("id").asText());
+                            query = query.replaceAll("\\$\\{1\\}",jn.get("time").asText());
+                            Database.save(query);
+                        }
                     }
                 }
                 // 処理時間(1分に一度の処理にするために演算)
@@ -216,13 +198,13 @@ public class quekeThread extends Thread {
                 && queakeInfo[2].equalsIgnoreCase(json.get("hypocenter").get("longitude").asText())
                 && queakeInfo[3].equalsIgnoreCase(time)){
 //            result = "@everyone\n";
-            result += "【地震速報 (続報)】" + "\n";
+            result += ":shaking_face:【地震速報 (続報)】:shaking_face:" + "\n";
         }else{
 
             result += "<@&1089680055891927040>\n";
             result += "\n";
 //            result += "@everyone\n";
-            result += "【地震速報】" + "\n";
+            result += "# 🌎【地震速報】🌎" + "\n";
         }
         // HEADER
 
@@ -286,7 +268,11 @@ public class quekeThread extends Thread {
         String[] scales = {"震度7", "震度6強", "震度6弱", "震度5強", "震度5弱", "震度4", "震度3"/*, "震度2", "震度1"*/};
         for(String key: scales){
             if(result.get(key).size() > 0){
-                builder.append("【" + key + "】\n");
+                if(key.equals("震度7") || key.equals("震度6強") || key.equals("震度6弱")){
+                    builder.append("## 【" + key + "】\n");
+                } else {
+                    builder.append("### 【" + key + "】\n");
+                }
                 String pref = "";
                 for(JsonNode jn: result.get(key)){
                     if(!pref.equalsIgnoreCase(jn.get("pref").asText())){
@@ -296,7 +282,7 @@ public class quekeThread extends Thread {
                         builder.append(jn.get("pref").asText().replaceAll(".*","　") + "　 " + jn.get("addr").asText() + "\n");
                     }
                 }
-                builder.append("===========================================\n");
+//                builder.append("===========================================\n");
             }
         }
 
@@ -336,12 +322,16 @@ public class quekeThread extends Thread {
                 result = "震度6強";
                 break;
             case 70:
-                result = "震度7強";
+                result = "震度7";
+                break;
+            case 99:
+                result = "予測不能(震度7より大きい)";
                 break;
         }
 
         return result;
     }
+
 
     private String getTsunami(String tsunami){
         String result = tsunami;
@@ -371,65 +361,266 @@ public class quekeThread extends Thread {
      *************************/
     private String tsunamiInfo(JsonNode json){
         StringBuilder builder = new StringBuilder();
-        List<String> MajorWarning = new ArrayList<>();
-        List<String> Warning = new ArrayList<>();
-        List<String> Watch = new ArrayList<>();
-        List<String> Unknown = new ArrayList<>();
+        List<JsonNode> MajorWarning = new ArrayList<>();
+        List<JsonNode> Warning = new ArrayList<>();
+        List<JsonNode> Watch = new ArrayList<>();
+        List<JsonNode> Unknown = new ArrayList<>();
         for (JsonNode jn : json){
             if(jn.get("grade").asText().equalsIgnoreCase("MajorWarning")){
-                MajorWarning.add(jn.get("name").asText());
+                MajorWarning.add(jn);
             }
             if(jn.get("grade").asText().equalsIgnoreCase("Warning")){
-                Warning.add(jn.get("name").asText());
+                Warning.add(jn);
             }
             if(jn.get("grade").asText().equalsIgnoreCase("Watch")){
-                Watch.add(jn.get("name").asText());
+                Watch.add(jn);
             }
             if(jn.get("grade").asText().equalsIgnoreCase("Unknown")){
-                Unknown.add(jn.get("name").asText());
+                Unknown.add(jn);
             }
+        }
+        builder.append("<@&1089680055891927040>\n");
+        builder.append("\n");
+        if(json.get("cancelled").asBoolean()){
+            builder.append("各津波予報が解除されました。\n");
+            Config conf = YAML.getConfig();
+            for(String id: conf.getEath_quake_infomation_id()) {
+                TextChannel tc = re.getJDA().getTextChannelById(id);
+                tc.sendMessage(builder.toString()).queue();
+            }
+        }else {
+            /// 情報生成
+            Config conf = YAML.getConfig();
+            for(String id: conf.getEath_quake_infomation_id()) {
+                TextChannel tc = re.getJDA().getTextChannelById(id);
+                if(MajorWarning.size() > 0) {
+//            builder.append("===========================================\n");
+                    builder.append("# 【大津波警報】\n");
+                    builder.append("** 3mを超えるの津波が予測されます。 **\n");
+                    builder.append("木造家屋が全壊・流失し、人は津波による流れに巻き込まれます。\n" +
+                            "沿岸部や川沿いにいる人は、** ただちに高台や避難ビルなど安全な場所へ避難してください。 **\n");
+                    builder.append("\n");
+                    builder.append("対象エリア:\n");
 
-            // 生成
-            if(MajorWarning.size() > 0){
+                    tc.sendMessage(builder.toString()).queue();
+                    builder = new StringBuilder();
+                    for (JsonNode jn: MajorWarning) {
+                        builder.append("### " + jn.get("name").asText() + "\n");
 
-                builder.append("===========================================\n");
-                builder.append("【大津波警報】\n");
-                builder.append("** 3mを超えるの津波が予測されます。 **\n");
-                builder.append("木造家屋が全壊・流失し、人は津波による流れに巻き込まれます。\n" +
-                        "沿岸部や川沿いにいる人は、ただちに高台や避難ビルなど安全な場所へ避難してください。\n");
+                        boolean reached = false;
+                        for (JsonNode firstHeight: jn.get("firstHeight")){
+                            if(! firstHeight.get("arrivalTime").isEmpty()){
+                                builder.append("> 津波到達予想時刻: " + firstHeight.get("arrivalTime").asText() + "\n");
+                            }
 
-                for(String area: MajorWarning){
-                    builder.append(area + "\n");
+                            builder.append("> " + firstHeight.get("condition").asText() + "\n");
+                            if (!reached && !firstHeight.get("condition").asText().equals("第１波の到達を確認")){
+                                reached = true;
+                            }
+                        }
+                        if(!reached){
+                            for (JsonNode maxHeight: jn.get("maxHeight")){
+
+                                builder.append("> 予想される津波の高さ: " + maxHeight.get("description").asText() + "\n");
+                            }
+                        }
+                        tc.sendMessage(builder.toString()).queue();
+                        builder = new StringBuilder();
+
+                    }
                 }
 
-            }
-            if(Warning.size() > 0){
+                if(Warning.size() > 0) {
+//            builder.append("===========================================\n");
+                    builder.append("# 【津波警報】\n");
+                    builder.append("** 1mを超3m以下の津波が予測されます。**\n");
+                    builder.append("標高の低いところでは津波が襲い、浸水被害が発生します。人は津波による流れに巻き込まれます。\n" +
+                            "沿岸部や川沿いにいる人は、** ただちに高台や避難ビルなど安全な場所へ避難してください。 **\n");
+                    builder.append("\n");
+                    builder.append("対象エリア:\n");
 
-                builder.append("===========================================\n");
-                builder.append("【津波警報】\n");
-                builder.append("** 1mを超3m以下の津波が予測されます。**\n");
-                builder.append("標高の低いところでは津波が襲い、浸水被害が発生します。人は津波による流れに巻き込まれます。\n" +
-                        "沿岸部や川沿いにいる人は、ただちに高台や避難ビルなど安全な場所へ避難してください。\n");
-                builder.append("\n");
-                for(String area: Warning){
-                    builder.append(area + "\n");
+                    tc.sendMessage(builder.toString()).queue();
+                    builder = new StringBuilder();
+
+                    for (JsonNode jn: MajorWarning) {
+                        builder.append("### "+ jn.get("name").asText() + "\n");
+                        boolean reached = false;
+                        for (JsonNode firstHeight: jn.get("firstHeight")){
+                            if(! firstHeight.get("arrivalTime").isEmpty()){
+                                builder.append("> 津波到達予想時刻: " + firstHeight.get("arrivalTime").asText() + "\n");
+                            }
+
+                            builder.append("> " + firstHeight.get("condition").asText() + "\n");
+                            if (!reached && !firstHeight.get("condition").asText().equals("第１波の到達を確認")){
+                                reached = true;
+                            }
+                        }
+                        if(!reached){
+                            for (JsonNode maxHeight: jn.get("maxHeight")){
+
+                                builder.append("> 予想される津波の高さ: " + maxHeight.get("description").asText() + "\n");
+                            }
+                        }
+
+                        tc.sendMessage(builder.toString()).queue();
+                        builder = new StringBuilder();
+
+                    }
                 }
 
-            }
-            if(Watch.size() > 0){
+                if(Warning.size() > 0) {
+//            builder.append("===========================================\n");
+                    builder.append("# 【津波注意報】\n");
+                    builder.append("** 0.2m超1m以下の津波が予測されます。**\n");
+                    builder.append("海の中では人は速い流れに巻き込まれ、また、養殖いかだが流失し小型船舶が転覆します。\n");
+                    builder.append("海の中にいる人はただちに海から上がって、** 海岸から離れてください。 **\n");
+                    builder.append("\n");
+                    builder.append("対象エリア:\n");
 
-                builder.append("===========================================\n");
-                builder.append("【津波注意報】\n");
-                builder.append("** 0.2m超1m以下の津波が予測されます。**\n");
-                builder.append("海の中では人は速い流れに巻き込まれ、また、養殖いかだが流失し小型船舶が転覆します。\n" +
-                        "海の中にいる人はただちに海から上がって、海岸から離れてください。\n");
-                for(String area: Watch){
-                    builder.append(area + "\n");
+                    tc.sendMessage(builder.toString()).queue();
+                    builder = new StringBuilder();
+
+                    for (JsonNode jn: MajorWarning) {
+                        builder.append("### "+ jn.get("name").asText() + "\n");
+
+                        boolean reached = false;
+                        for (JsonNode firstHeight: jn.get("firstHeight")){
+                            if(! firstHeight.get("arrivalTime").isEmpty()){
+                                builder.append("> 津波到達予想時刻: " + firstHeight.get("arrivalTime").asText() + "\n");
+                            }
+
+                            builder.append("> " + firstHeight.get("condition").asText() + "\n");
+                            if (!reached && !firstHeight.get("condition").asText().equals("第１波の到達を確認")){
+                                reached = true;
+                            }
+                        }
+                        if(!reached){
+                            for (JsonNode maxHeight: jn.get("maxHeight")){
+
+                                builder.append("> 予想される津波の高さ: " + maxHeight.get("description").asText() + "\n");
+                            }
+                        }
+
+                        tc.sendMessage(builder.toString()).queue();
+                        builder = new StringBuilder();
+
+                    }
                 }
 
             }
         }
 
+
+
         return builder.toString();
     }
+
+
+    /*************************
+     * 以下緊急地震速報に関する情報の整理
+     *************************/
+    private String EEW_Info(JsonNode json) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("@everyone\n");
+        builder.append("# 📢【緊急地震速報】📢\n");
+        JsonNode arthQuake = json.get("earthquake");
+        JsonNode hypocenter = arthQuake.get("hypocenter");
+        if(!arthQuake.get("condition").asText().isEmpty()){
+            builder.append("##" + arthQuake.get("condition").asText() + "\n");
+        }
+        builder.append("** 震央地: **" + hypocenter.get("name").asText() + "\n");
+        builder.append("** 地震発生時刻: **" + arthQuake.get("arrivalTime").asText() + "\n");
+        builder.append("** 震源の深さ: **" + hypocenter.get("depth").asText() + "\n");
+        builder.append("** マグニチュード: **" + hypocenter.get("magnitude").asText() + "\n");
+        builder.append("\n");
+        builder.append("\n");
+        Map<String, List<JsonNode>> kindCode10 = new HashMap<String, List<JsonNode>>();
+        Map<String, List<JsonNode>> kindCode11 = new HashMap<String, List<JsonNode>>();
+        Map<String, List<JsonNode>> kindCode19 = new HashMap<String, List<JsonNode>>();
+        String[] scales = {"震度7", "震度6強", "震度6弱", "震度5強", "震度5弱", "震度4", "震度3"/*, "震度2", "震度1"*/};
+
+        // 初期化
+        for(String str: scales){
+            kindCode10.put(str, new ArrayList<>());
+            kindCode11.put(str, new ArrayList<>());
+            kindCode19.put(str, new ArrayList<>());
+        }
+
+        for(JsonNode jn : json.get("areas")) {
+            if(jn.get("kindCode").asInt() == 10){
+                List<JsonNode> lst = kindCode10.get(getScale(jn.get("scaleFrom").asInt()));
+                lst.add(jn);
+                kindCode10.put(getScale(jn.get("scaleFrom").asInt()), lst);
+            }
+            if(jn.get("kindCode").asInt() == 11){
+                List<JsonNode> lst = kindCode11.get(getScale(jn.get("scaleFrom").asInt()));
+                lst.add(jn);
+                kindCode11.put(getScale(jn.get("scaleFrom").asInt()), lst);
+            }
+            if(jn.get("kindCode").asInt() == 19){
+                List<JsonNode> lst = kindCode19.get(getScale(jn.get("scaleFrom").asInt()));
+                lst.add(jn);
+                kindCode19.put(getScale(jn.get("scaleFrom").asInt()), lst);
+            }
+
+        }
+
+        for(String key: kindCode10.keySet()){
+            if(kindCode10.get(key).size() > 0){
+                builder.append("## 最大震度: " + key + "\n");
+                builder.append("### 主要動について、未到達と予測" + "\n");
+                List<JsonNode> lst = kindCode10.get(key);
+                for(JsonNode jn : lst){
+                    builder.append("> " + jn.get("name").asText() + "\n");
+                }
+            }
+        }
+
+        for(String key: kindCode11.keySet()){
+            if(kindCode11.get(key).size() > 0){
+                builder.append("## 最大震度: " + key + "\n");
+                builder.append("### 主要動の到達予想なし（PLUM法による予想）" + "\n");
+                List<JsonNode> lst = kindCode11.get(key);
+                for(JsonNode jn : lst){
+                    builder.append("> " + jn.get("name").asText() + "\n");
+                }
+            }
+        }
+
+        for(String key: kindCode19.keySet()){
+            if(kindCode19.get(key).size() > 0){
+                builder.append("## 最大震度: " + key + "\n");
+                builder.append("### 主要動の到達予想なし（PLUM法による予想）" + "\n");
+                List<JsonNode> lst = kindCode19.get(key);
+                for(JsonNode jn : lst){
+                    builder.append("> " + jn.get("name").asText() + "\n");
+                }
+            }
+        }
+        return builder.toString();
+    }
+
+
+    private List<String> sendMsgTrim(String msg) {
+        List<String> result = new ArrayList<>();
+        if(msg.length() <= 2000){
+            // 2000文字以下の場合
+            result.add(msg);
+        } else {
+            // 2000を超える場合
+            String[] lines = msg.split("\n");
+            String newLine = "";
+            for(String ln : lines){
+                if(new String(newLine + ln + "\n").length() < 2000) {
+                    newLine += ln + "\n";
+                }else {
+                    result.add(newLine);
+                    newLine = ln + "\n";
+                }
+            }
+
+        }
+        return result;
+    }
+
 }

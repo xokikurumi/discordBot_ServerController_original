@@ -59,6 +59,7 @@ public class Main extends ListenerAdapter  {
         log.info("DiscordBot Start.");
         Notice.info("DiscordBot Start");
 
+
         JDA jda = JDABuilder.createDefault(commonToken.TOKEN)
                 .enableIntents(GatewayIntent.MESSAGE_CONTENT)
                 .enableIntents(GatewayIntent.GUILD_VOICE_STATES)
@@ -83,6 +84,8 @@ public class Main extends ListenerAdapter  {
             guild.updateCommands().addCommands(rouCmd).addCommands(mathCmd).addCommands(TRPG_6Cmd).addCommands(TRPG_7Cmd).queue();
         }
 
+
+
         jda.addEventListener(new Main());
     }
 
@@ -93,17 +96,23 @@ public class Main extends ListenerAdapter  {
         log.info("Ready OK");
         super.onReady(event);
 
-        quekeThread qt = new quekeThread(event);
-        CoterieEvents ce = new CoterieEvents(event);
-        Notice.info("Event Start.");
 
-        qt.start();
+        CoterieEvents ce = new CoterieEvents(event);
+
+//        qt.start();
 //        ce.start();
         log.info("QuekeEvent Start!");
     }
 
     @Override
     public void onMessageReceived(MessageReceivedEvent e) {
+        if(qt == null){
+            qt = new quekeThread(e);
+            qt.start();
+        }
+
+        
+//        System.out.println(this.qt.getState());
 
         Calendar calLog = Calendar.getInstance();
         SimpleDateFormat sdfLog = new SimpleDateFormat("YYYY/MM/dd HH:mm:ss.SSS");
@@ -112,8 +121,16 @@ public class Main extends ListenerAdapter  {
         StringBuilder logFileMsg = new StringBuilder();
 
         logFileMsg.append("[" + sdfLog.format(calLog.getTime()) + "]");
-        logFileMsg.append("[" + e.getMember().getUser().getName() + "]");
-//        logFileMsg.append("[" + e.getMember().getUser().get+ "]");
+        if(e.getAuthor().isBot()){
+            logFileMsg.append("[BOT]");
+        }else{
+            if(e.getMember().getUser() == null){
+                logFileMsg.append("[EMPTY]");
+            }else{
+                logFileMsg.append("[" + e.getMember().getUser().getName() + "]");
+            }
+        }
+        logFileMsg.append("[" + e.getMessageId()+ "]");
 
 
         List<StickerItem> stickerList = e.getMessage().getStickers();
@@ -128,7 +145,7 @@ public class Main extends ListenerAdapter  {
                 @Override
                 public void run() {
                     for(Message.Attachment attachment : listAttachiment){
-                        logger.downloadFile(attachment.getUrl(),e.getGuild().getName(),
+                        logger.downloadFile(attachment.getUrl(),e.getGuild().getName() + "\\" + e.getChannel().getName(),
                                 sdfYYYYMMDDHHMMSSLog.format(calLog.getTime()) + "_" + e.getMessageId() + "_" + attachment.getFileName());
                     }
                 }

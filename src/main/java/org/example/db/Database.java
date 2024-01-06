@@ -104,4 +104,39 @@ public class Database {
             e.printStackTrace();
         }
     }
+
+    public static String[] executeTsunamiCheckIdTStr(String sql){
+
+        String[] result = {"", ""};
+
+        try {
+            con = DriverManager.getConnection(CONNECT_STRING, USERID, PASSWORD);
+
+            PreparedStatement ps = con.prepareStatement(sql);
+
+            ResultSet rs = ps.executeQuery();
+            String id = "";
+
+            while(rs.next()) {
+                result[0] = rs.getString("id");
+                result[1] = rs.getString("tsunami_time");
+
+            }
+
+//            result = !id.isEmpty();
+
+            rs.close();
+            if (ps != null) {
+                ps.close();
+            }
+            if (con != null) {
+                con.close();
+            }
+        } catch (SQLException e) {
+            // TODO 自動生成された catch ブロック
+            e.printStackTrace();
+        }
+
+        return result;
+    }
 }

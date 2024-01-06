@@ -342,7 +342,10 @@ public class ChatCommands {
     public static void sendFire(MessageReceivedEvent e){
         int random = 0;
         try {
-
+            if(e.getAuthor().isBot()){
+                // BOTの場合抽選を行わない
+                return;
+            }
             SecureRandom sr = SecureRandom.getInstance("SHA1PRNG");
             random = sr.nextInt(9999) + 1;
         } catch (NoSuchAlgorithmException e1) {
